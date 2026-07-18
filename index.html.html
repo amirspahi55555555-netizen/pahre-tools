@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>فروشگاه ابزارآلات پهره</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Vazirmatn', Tahoma, sans-serif; background: #F8F3E9; color: #2B2320; }
+  .tile-rule { height: 4px; background: repeating-linear-gradient(90deg, #1F6F78 0 10px, #C98A3E 10px 20px); }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes floatWrench { 0%, 100% { transform: rotate(-8deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-3px); } }
+  @keyframes pulseGlow { 0%, 100% { box-shadow: 0 6px 16px rgba(0,0,0,0.18); } 50% { box-shadow: 0 8px 22px rgba(201,138,62,0.45); } }
+  @keyframes shimmerBg { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+  .card-anim { animation: cardIn 0.25s ease-out both; }
+  .add-btn { animation: pulseGlow 2.6s ease-in-out infinite; transition: transform 0.15s; }
+  .add-btn:active { transform: translateX(-50%) scale(0.94); }
+  .header-shine {
+    background: linear-gradient(120deg, #1F6F78 0%, #24818C 25%, #1F6F78 50%, #24818C 75%, #1F6F78 100%);
+    background-size: 200% 100%;
+    animation: shimmerBg 8s linear infinite;
+  }
+  .wrench-badge { animation: floatWrench 3.2s ease-in-out infinite; transform-origin: center; }
+  .tab-btn { transition: background 0.2s, color 0.2s, transform 0.1s; }
+  .tab-btn:active { transform: scale(0.97); }
+  .row-hover { transition: box-shadow 0.2s, transform 0.15s; }
+  .row-hover:hover { box-shadow: 0 4px 14px rgba(31,111,120,0.12); transform: translateY(-1px); }
+  .icon-btn { transition: transform 0.12s, background 0.15s; }
+  .icon-btn:active { transform: scale(0.9); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- decorative header icon set, shown once React mounts -->
+
+<!-- React -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- Firebase (compat SDK, no build step needed) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+  // ====== IMPORTANT: fill in your own Firebase project config here ======
+  // Get this from: Firebase Console > Project Settings > General > Your apps > SDK setup
+  const firebaseConfig = {
+    apiKey: "AIzaSyCNQAB1JPIby3cSl_W1I19kS6g-G8qtDZk",
+    authDomain: "continue-4721b.firebaseapp.com",
+    projectId: "continue-4721b",
+    storageBucket: "continue-4721b.firebasestorage.app",
+    messagingSenderId: "974768607301",
+    appId: "1:974768607301:web:cb5c5c5a4a116ee7ef932c"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+</script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
+
+const toFa = (n) => (n === null || n === undefined || isNaN(n)) ? "۰" : Number(n).toLocaleString("fa-IR");
+const todayFa = () => new Date().toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric" });
+const timeFa = (ts) => new Date(ts).toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
+
+function resizeImage(file, maxSize = 100, quality = 0.55) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        const scale = Math.min(1, maxSize / Math.max(width, height));
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function Icon({ path, size = 18, color = "currentColor" }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: path }} />;
+}
+const ICONS = {
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  pencil: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+  check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  box: '<path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><path d="M3 8v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8"/><path d="M3 8h18"/><path d="M12 8v13"/>',
+  receipt: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/>',
+  alert: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/>',
+  screwdriver: '<path d="m14.5 12.5-8 8a2.12 2.12 0 1 1-3-3l8-8"/><path d="M17 8 8 17"/><path d="M17 2 22 7l-3 3-5-5Z"/>',
+};
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function App() {
+  const [products, setProducts] = useState([]);
+  const [sold, setSold] = useState([]);
+  const [usdRate, setUsdRate] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
+  const [dbOffline, setDbOffline] = useState(false);
+  const [toast, setToast] = useState("");
+  const [tab, setTab] = useState("inventory");
+  const [query, setQuery] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [fName, setFName] = useState("");
+  const [fPrice, setFPrice] = useState("");
+  const [fLinked, setFLinked] = useState(false);
+  const [fImage, setFImage] = useState(null);
+  const fileRef = useRef(null);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2200);
+  };
+
+  useEffect(() => {
+    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+      setDbOffline(true);
+      setLoaded(true);
+      return;
+    }
+    const unsubP = db.collection("products").orderBy("addedAt", "desc").onSnapshot(
+      (snap) => { setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setDbOffline(false); },
+      () => setDbOffline(true)
+    );
+    const unsubS = db.collection("sold").orderBy("soldAt", "desc").onSnapshot(
+      (snap) => setSold(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+    db.collection("settings").doc("rate").get().then(doc => {
+      if (doc.exists) setUsdRate(doc.data().usdRate || 0);
+      setLoaded(true);
+    }).catch(() => { setDbOffline(true); setLoaded(true); });
+    return () => { unsubP(); unsubS(); };
+  }, []);
+
+  const saveRate = async (rate) => {
+    setUsdRate(rate);
+    try { await db.collection("settings").doc("rate").set({ usdRate: rate }); } catch (_) { setDbOffline(true); }
+  };
+
+  const resetForm = () => {
+    setFName(""); setFPrice(""); setFLinked(false); setFImage(null); setEditingId(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+  const openAdd = () => { resetForm(); setFormOpen(true); };
+  const openEdit = (p) => {
+    setEditingId(p.id); setFName(p.name); setFPrice(String(p.price));
+    setFLinked(p.linked); setFImage(p.image || null); setFormOpen(true);
+  };
+  const handleImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try { setFImage(await resizeImage(file)); } catch (_) { setError("عکس بارگذاری نشد"); }
+  };
+
+  const submitForm = async () => {
+    if (!fName.trim() || fPrice === "" || isNaN(Number(fPrice))) return;
+    try {
+      const payload = {
+        name: fName.trim(),
+        price: Number(fPrice),
+        linked: fLinked,
+        baseRate: fLinked ? (usdRate || 0) : null,
+        image: fImage,
+      };
+      if (editingId) {
+        await db.collection("products").doc(editingId).update(payload);
+      } else {
+        if (products.length >= 400) { setError("سقف ۴۰۰ قلم پر شده"); return; }
+        await db.collection("products").add({ ...payload, addedAt: Date.now() });
+      }
+      setFormOpen(false); resetForm();
+      showToast("با موفقیت ثبت شد");
+    } catch (_) { setError("ذخیره نشد، دوباره امتحان کن"); }
+  };
+
+  const deleteProduct = async (id) => {
+    try { await db.collection("products").doc(id).delete(); } catch (_) { setError("حذف نشد"); }
+  };
+
+  const deleteSold = async (id) => {
+    try { await db.collection("sold").doc(id).delete(); } catch (_) { setError("حذف نشد"); }
+  };
+
+  const markSold = async (p) => {
+    const displayPrice = displayPriceOf(p);
+    try {
+      await db.collection("sold").add({ name: p.name, price: displayPrice, soldAt: Date.now(), soldAtFa: todayFa() });
+      showToast("با موفقیت ثبت شد");
+    } catch (_) { setError("ثبت فروش نشد"); }
+  };
+
+  const filtered = useMemo(() => {
+    const q = query.trim();
+    if (!q) return products;
+    return products.filter(p => p.name.includes(q));
+  }, [products, query]);
+
+  // linked items: price entered is TODAY's toman price at baseRate.
+  // when usdRate moves, price scales proportionally: newPrice = price * (currentRate / baseRate)
+  function displayPriceOf(p) {
+    if (p.linked && p.baseRate) {
+      return Math.round(p.price * ((usdRate || p.baseRate) / p.baseRate));
+    }
+    return p.price;
+  }
+
+  const totalRevenue = useMemo(() => sold.reduce((a, s) => a + (s.price || 0), 0), [sold]);
+
+  const groupedSold = useMemo(() => {
+    const groups = [];
+    const map = {};
+    sold.forEach(s => {
+      const key = s.soldAtFa || "نامشخص";
+      if (!map[key]) { map[key] = { date: key, items: [], total: 0 }; groups.push(map[key]); }
+      map[key].items.push(s);
+      map[key].total += (s.price || 0);
+    });
+    return groups;
+  }, [sold]);
+
+  return (
+    <div style={{ minHeight: "100vh" }}>
+      <div className="header-shine" style={{ color: "#FAF6EE", padding: "20px 18px 26px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="wrench-badge" style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon path={ICONS.wrench} size={24} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 21, fontWeight: 800, lineHeight: 1.3 }}>فروشگاه ابزارآلات پهره</h1>
+            <p style={{ fontSize: 12.5, opacity: 0.85, marginTop: 2 }}>مدیریت: ابجامه</p>
+          </div>
+        </div>
+        <p style={{ margin: "10px 0 0", fontSize: 13, opacity: 0.85 }}>
+          {toFa(products.length)} قلم کالا در موجودی · امروز {todayFa()}
+        </p>
+        <div style={{ marginTop: 16, background: "rgba(255,255,255,0.12)", borderRadius: 12, padding: "10px 12px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 500 }}>امروز دلار چنده؟</span>
+            <input type="number" value={usdRate || ""} onChange={e => saveRate(Number(e.target.value) || 0)}
+              placeholder="مثلاً ۱۸۰۰۰۰"
+              style={{ width: 130, textAlign: "center", padding: "6px 8px", borderRadius: 8, border: "none", fontFamily: "inherit", fontWeight: 700 }} />
+          </div>
+          {usdRate > 0 && (
+            <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: "#FFE9C7" }}>
+              امروز دلار {toFa(usdRate)} تومانه
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="tile-rule" />
+
+      {dbOffline && (
+        <div style={{ background: "#FDEDEA", color: "#B45248", padding: "10px 18px", fontSize: 12.5, display: "flex", gap: 8, alignItems: "flex-start" }}>
+          <Icon path={ICONS.alert} size={16} />
+          <span>دیتابیس وصل نیست، چیزی که ثبت کنی ذخیره نمی‌مونه. باید توی فایل index.html بخش firebaseConfig رو با اطلاعات پروژه‌ی Firebase خودت پر کنی (توی راهنما.txt توضیح داده شده).</span>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, padding: "14px 18px 0" }}>
+        {["inventory", "report"].map(t => (
+          <button key={t} className="tab-btn" onClick={() => setTab(t)}
+            style={{ flex: 1, padding: 10, borderRadius: 10, border: "none", fontFamily: "inherit", fontWeight: 700, fontSize: 14, cursor: "pointer",
+              background: tab === t ? "#1F6F78" : "#EFE7D6", color: tab === t ? "#FAF6EE" : "#5A5044" }}>
+            {t === "inventory" ? "موجودی" : "فروخته‌شده‌ها"}
+          </button>
+        ))}
+      </div>
+
+      {error && <div style={{ margin: "12px 18px 0", color: "#B45248", fontSize: 13 }}>{error}</div>}
+
+      {!loaded ? (
+        <div style={{ padding: 30, textAlign: "center", color: "#8B8073" }}>در حال بارگذاری…</div>
+      ) : tab === "inventory" ? (
+        <div style={{ padding: "16px 18px 100px" }}>
+          <div style={{ position: "relative", marginBottom: 14 }}>
+            <div style={{ position: "absolute", right: 12, top: 12, color: "#8B8073" }}><Icon path={ICONS.search} size={18} /></div>
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="جستجوی اسم جنس…"
+              style={{ width: "100%", padding: "11px 40px 11px 14px", borderRadius: 12, border: "1px solid #E4DAC4", background: "#fff", fontFamily: "inherit", fontSize: 14 }} />
+          </div>
+
+          {filtered.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#8B8073", padding: "40px 10px", fontSize: 14 }}>
+              {products.length === 0 ? "هنوز جنسی ثبت نکردی. با دکمهٔ + شروع کن." : "چیزی پیدا نشد."}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {filtered.map((p, i) => (
+                <div key={p.id} className="card-anim row-hover" style={{ background: "#fff", borderRadius: 14, padding: 10, display: "flex", alignItems: "center", gap: 12, border: "1px solid #EFE7D6", animationDelay: (i * 0.03) + "s" }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 10, overflow: "hidden", background: "#F3ECDC", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {p.image ? <img src={p.image} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Icon path={ICONS.screwdriver} size={20} color="#C9BFA8" />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}>{p.name}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1F6F78" }}>
+                      {toFa(displayPriceOf(p))} تومان
+                      {p.linked && <span style={{ fontSize: 11, fontWeight: 500, color: "#C98A3E", marginRight: 6 }}>(دلاری)</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <button onClick={() => markSold(p)} className="icon-btn" style={{ border: "none", background: "#1F6F78", color: "#fff", borderRadius: 8, padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontFamily: "inherit" }}>
+                      <Icon path={ICONS.check} size={14} /> فروش رفت
+                    </button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => openEdit(p)} className="icon-btn" style={{ flex: 1, border: "1px solid #E4DAC4", background: "#fff", borderRadius: 8, padding: 6, cursor: "pointer" }}><Icon path={ICONS.pencil} size={13} color="#5A5044" /></button>
+                      <button onClick={() => deleteProduct(p.id)} className="icon-btn" style={{ flex: 1, border: "1px solid #E4DAC4", background: "#fff", borderRadius: 8, padding: 6, cursor: "pointer" }}><Icon path={ICONS.trash} size={13} color="#B45248" /></button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button onClick={openAdd} className="add-btn"
+            style={{ position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)", background: "#C98A3E", color: "#fff", border: "none", borderRadius: 999, padding: "13px 22px", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontFamily: "inherit" }}>
+            <Icon path={ICONS.plus} size={18} /> افزودن جنس
+          </button>
+        </div>
+      ) : (
+        <div style={{ padding: "16px 18px 40px" }}>
+          <div style={{ background: "#1F6F78", color: "#fff", borderRadius: 14, padding: 16, marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
+            <div><div style={{ fontSize: 12, opacity: 0.85 }}>تعداد فروش</div><div style={{ fontSize: 20, fontWeight: 800 }}>{toFa(sold.length)}</div></div>
+            <div style={{ textAlign: "left" }}><div style={{ fontSize: 12, opacity: 0.85 }}>مجموع فروش</div><div style={{ fontSize: 20, fontWeight: 800 }}>{toFa(totalRevenue)} تومان</div></div>
+          </div>
+          {groupedSold.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#8B8073", padding: "30px 10px", fontSize: 14 }}>
+              <div style={{ marginBottom: 8, opacity: 0.5 }}><Icon path={ICONS.receipt} size={28} /></div>
+              <div>هنوز چیزی فروش نرفته.</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              {groupedSold.map(g => (
+                <div key={g.date}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, paddingBottom: 6, borderBottom: "2px solid #E4DAC4" }}>
+                    <span style={{ fontWeight: 800, fontSize: 14, color: "#1F6F78" }}>{g.date}</span>
+                    <span style={{ fontSize: 12.5, color: "#8B8073" }}>{toFa(g.items.length)} فروش · {toFa(g.total)} تومان</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {g.items.map(s => (
+                      <div key={s.id} className="card-anim row-hover" style={{ background: "#fff", border: "1px solid #EFE7D6", borderRadius: 12, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                        <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 14 }}>{s.name}</div><div style={{ fontSize: 11.5, color: "#8B8073" }}>{timeFa(s.soldAt)}</div></div>
+                        <div style={{ fontWeight: 800, color: "#1F6F78" }}>{toFa(s.price)} تومان</div>
+                        <button onClick={() => deleteSold(s.id)} className="icon-btn" style={{ border: "1px solid #E4DAC4", background: "#fff", borderRadius: 8, padding: 6, cursor: "pointer", flexShrink: 0 }}>
+                          <Icon path={ICONS.trash} size={13} color="#B45248" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {formOpen && (
+        <div onClick={() => setFormOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(43,35,32,0.5)", display: "flex", alignItems: "flex-end", zIndex: 50 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#FAF6EE", width: "100%", borderRadius: "20px 20px 0 0", padding: 20, maxHeight: "85vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h2 style={{ fontSize: 17, fontWeight: 800 }}>{editingId ? "ویرایش جنس" : "افزودن جنس جدید"}</h2>
+              <button onClick={() => setFormOpen(false)} style={{ border: "none", background: "none", cursor: "pointer" }}><Icon path={ICONS.x} size={20} /></button>
+            </div>
+            <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>اسم جنس</label>
+            <input value={fName} onChange={e => setFName(e.target.value)} placeholder="مثلاً پمپ الکتروژن"
+              style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #E4DAC4", marginBottom: 14, fontFamily: "inherit", fontSize: 14 }} />
+            <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>عکس جنس</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+              <div style={{ width: 60, height: 60, borderRadius: 10, background: "#F3ECDC", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                {fImage ? <img src={fImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Icon path={ICONS.screwdriver} size={22} color="#C9BFA8" />}
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{ fontSize: 13 }} />
+            </div>
+            <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>قیمت امروز (تومان)</label>
+            <input type="number" value={fPrice} onChange={e => setFPrice(e.target.value)} placeholder="مثلاً ۱۲۰۰۰۰۰۰"
+              style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #E4DAC4", marginBottom: 10, fontFamily: "inherit", fontSize: 14 }} />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 6, cursor: "pointer" }}>
+              <input type="checkbox" checked={fLinked} onChange={e => setFLinked(e.target.checked)} />
+              وابسته به نرخ دلار باشه
+            </label>
+            {fLinked && (
+              <p style={{ fontSize: 11.5, color: "#8B8073", marginBottom: 14, lineHeight: 1.7 }}>
+                یعنی: همین قیمتی که الان نوشتی، مال دلار {usdRate ? toFa(usdRate) : "…"} تومانه. هر وقت بالای صفحه نرخ دلار رو عوض کنی، این قیمت خودش به‌نسبت بالا یا پایین می‌ره.
+              </p>
+            )}
+            <button onClick={submitForm} style={{ width: "100%", background: "#1F6F78", color: "#fff", border: "none", borderRadius: 12, padding: 13, fontWeight: 800, fontSize: 15, cursor: "pointer", fontFamily: "inherit", marginTop: fLinked ? 0 : 8 }}>
+              {editingId ? "ذخیره تغییرات" : "ذخیره و افزودن به موجودی"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div style={{ position: "fixed", bottom: 90, left: "50%", transform: "translateX(-50%)", background: "#2B2320", color: "#fff", padding: "10px 20px", borderRadius: 999, fontSize: 13.5, fontWeight: 700, zIndex: 100, animation: "toastIn 0.2s ease-out", boxShadow: "0 6px 16px rgba(0,0,0,0.25)", display: "flex", alignItems: "center", gap: 6 }}>
+          <Icon path={ICONS.check} size={15} /> {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
