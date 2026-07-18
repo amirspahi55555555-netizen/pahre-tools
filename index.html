@@ -204,11 +204,33 @@ function App() {
     try { await db.collection("sold").doc(id).delete(); } catch (_) { setError("حذف نشد"); }
   };
 
-  const markSold = async (p) => {
+  const [soldModalProduct, setSoldModalProduct] = useState(null);
+  const [soldDate, setSoldDate] = useState("");
+
+  const toYMD = (d) => {
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  };
+
+  const openSoldModal = (p) => {
+    setSoldModalProduct(p);
+    setSoldDate(toYMD(new Date()));
+  };
+
+  const confirmSold = async () => {
+    if (!soldModalProduct) return;
+    const p = soldModalProduct;
     const displayPrice = displayPriceOf(p);
+    const chosen = soldDate ? new Date(soldDate + "T12:00:00") : new Date();
     try {
-      await db.collection("sold").add({ name: p.name, price: displayPrice, soldAt: Date.now(), soldAtFa: todayFa() });
+      await db.collection("sold").add({
+        name: p.name,
+        price: displayPrice,
+        soldAt: chosen.getTime(),
+        soldAtFa: chosen.toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric" }),
+      });
       showToast("با موفقیت ثبت شد");
+      setSoldModalProduct(null);
     } catch (_) { setError("ثبت فروش نشد"); }
   };
 
@@ -320,7 +342,7 @@ function App() {
                     </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <button onClick={() => markSold(p)} className="icon-btn" style={{ border: "none", background: "#1F6F78", color: "#fff", borderRadius: 8, padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontFamily: "inherit" }}>
+                    <button onClick={() => openSoldModal(p)} className="icon-btn" style={{ border: "none", background: "#1F6F78", color: "#fff", borderRadius: 8, padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontFamily: "inherit" }}>
                       <Icon path={ICONS.check} size={14} /> فروش رفت
                     </button>
                     <div style={{ display: "flex", gap: 6 }}>
@@ -406,6 +428,26 @@ function App() {
             )}
             <button onClick={submitForm} style={{ width: "100%", background: "#1F6F78", color: "#fff", border: "none", borderRadius: 12, padding: 13, fontWeight: 800, fontSize: 15, cursor: "pointer", fontFamily: "inherit", marginTop: fLinked ? 0 : 8 }}>
               {editingId ? "ذخیره تغییرات" : "ذخیره و افزودن به موجودی"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {soldModalProduct && (
+        <div onClick={() => setSoldModalProduct(null)} style={{ position: "fixed", inset: 0, background: "rgba(43,35,32,0.5)", display: "flex", alignItems: "flex-end", zIndex: 60 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#FAF6EE", width: "100%", borderRadius: "20px 20px 0 0", padding: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 800 }}>ثبت فروش: {soldModalProduct.name}</h2>
+              <button onClick={() => setSoldModalProduct(null)} style={{ border: "none", background: "none", cursor: "pointer" }}><Icon path={ICONS.x} size={20} /></button>
+            </div>
+            <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>تاریخ فروش</label>
+            <input type="date" value={soldDate} onChange={e => setSoldDate(e.target.value)}
+              style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #E4DAC4", marginBottom: 8, fontFamily: "inherit", fontSize: 14 }} />
+            <p style={{ fontSize: 11.5, color: "#8B8073", marginBottom: 16 }}>
+              اگه امروز فروش رفته همینو نگه دار. اگه مال چند روز پیشه، تاریخش رو از همین‌جا عوض کن.
+            </p>
+            <button onClick={confirmSold} style={{ width: "100%", background: "#1F6F78", color: "#fff", border: "none", borderRadius: 12, padding: 13, fontWeight: 800, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
+              ثبت فروش
             </button>
           </div>
         </div>
